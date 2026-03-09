@@ -4,6 +4,7 @@ export interface JiraIssue {
   summary: string;
   status: string;
   created?: string;
+  storyPoints?: number | null;
   assignee?: string;
   avatarUrl?: string;
   priority?: string;
@@ -24,4 +25,10 @@ export interface BoardColumn {
   title: string;
   statuses: string[];
   issues: JiraIssue[];
+}
+
+export interface SprintMeta {
+  name: string;
+  startDate?: string | null;
+  endDate?: string | null;
 }

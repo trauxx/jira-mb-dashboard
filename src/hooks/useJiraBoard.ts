@@ -90,6 +90,7 @@ export function useJiraBoard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sprintName, setSprintName] = useState<string>("");
+  const [sprintEndDate, setSprintEndDate] = useState<string | null>(null);
 
   const fetchBoard = useCallback(async (config: JiraConfig) => {
     setLoading(true);
@@ -112,6 +113,7 @@ export function useJiraBoard() {
       const data: {
         sprintName?: string;
         sprintStartDate?: string | null;
+        sprintEndDate?: string | null;
         issues: JiraIssue[];
       } = await res.json();
 
@@ -119,6 +121,7 @@ export function useJiraBoard() {
       const sprintStart = data.sprintStartDate
         ? new Date(data.sprintStartDate)
         : null;
+      setSprintEndDate(data.sprintEndDate ?? null);
       const issues = data.issues;
 
       // Distribute into columns
@@ -151,5 +154,5 @@ export function useJiraBoard() {
     }
   }, []);
 
-  return { columns, loading, error, sprintName, fetchBoard };
+  return { columns, loading, error, sprintName, sprintEndDate, fetchBoard };
 }

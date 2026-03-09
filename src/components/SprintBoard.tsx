@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { JiraConfig } from '@/types/jira';
-import { useJiraBoard, clearConfig } from '@/hooks/useJiraBoard';
-import BoardColumnComponent from './BoardColumn';
-import { Button } from '@/components/ui/button';
-import { RefreshCw, LogOut, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from "react";
+import { JiraConfig } from "@/types/jira";
+import { useJiraBoard, clearConfig } from "@/hooks/useJiraBoard";
+import BoardColumnComponent from "./BoardColumn";
+import { Button } from "@/components/ui/button";
+import { RefreshCw, LogOut, Loader2 } from "lucide-react";
 
 interface Props {
   config: JiraConfig;
@@ -13,7 +13,8 @@ interface Props {
 }
 
 export default function SprintBoard({ config, onLogout }: Props) {
-  const { columns, loading, error, sprintName, fetchBoard } = useJiraBoard();
+  const { columns, loading, error, sprintName, sprintEndDate, fetchBoard } =
+    useJiraBoard();
   const [clock, setClock] = useState(new Date());
 
   useEffect(() => {
@@ -30,15 +31,68 @@ export default function SprintBoard({ config, onLogout }: Props) {
     onLogout();
   };
 
-  const dateStr = clock.toLocaleDateString('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
+  const dateStr = clock.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   });
-  const timeStr = clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = clock.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
-  const totalIssues = columns.reduce((sum, c) => sum + c.issues.length, 0);
+  const {
+    totalIssues,
+    todoCount,
+    inProgressCount,
+    doneCount,
+    percTodo,
+    percInProgress,
+    percDone,
+  } = useMemo(() => {
+    const seen = new Set<string>();
+    let total = 0;
+    let todo = 0;
+    let inprog = 0;
+    let done = 0;
+
+    columns
+      .filter(
+        (c) => c.id === "todo" || c.id === "inprogress" || c.id === "done",
+      )
+      .forEach((col) => {
+        col.issues.forEach((issue) => {
+          // Skip if we already counted this issue (to avoid double-counting planned duplicates)
+          if (seen.has(issue.id)) return;
+          seen.add(issue.id);
+          total += 1;
+          if (col.id === "todo") todo += 1;
+          if (col.id === "inprogress") inprog += 1;
+          if (col.id === "done") done += 1;
+        });
+      });
+
+    const denom = total || 1; // avoid divide by zero
+    return {
+      totalIssues: total,
+      todoCount: todo,
+      inProgressCount: inprog,
+      doneCount: done,
+      percTodo: Math.round((todo / denom) * 100),
+      percInProgress: Math.round((inprog / denom) * 100),
+      percDone: Math.round((done / denom) * 100),
+    };
+  }, [columns]);
+
+  const sprintDaysLeft = useMemo(() => {
+    if (!sprintEndDate) return null;
+    const end = new Date(sprintEndDate);
+    if (Number.isNaN(end.getTime())) return null;
+    const now = new Date();
+    const diffMs = end.getTime() - now.getTime();
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  }, [sprintEndDate]);
 
   return (
     <div className="min-h-screen bg-background p-6 flex flex-col gap-5">
@@ -66,7 +120,11 @@ export default function SprintBoard({ config, onLogout }: Props) {
             disabled={loading}
             className="text-muted-foreground hover:text-foreground"
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -79,11 +137,57 @@ export default function SprintBoard({ config, onLogout }: Props) {
         </div>
       </div>
 
-      {/* Stats bar */}
-      <div className="flex gap-3 text-xs">
-        <span className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground">
-          Demandas da Sprint: <strong className="text-foreground">{totalIssues}</strong>
-        </span>
+      {/* Stats bar + progress */}
+      <div className="flex flex-col gap-3 text-xs">
+        <div className="flex flex-wrap gap-3">
+          <span className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground">
+            Demandas da Sprint:{" "}
+            <strong className="text-foreground">{totalIssues}</strong>
+          </span>
+          <span className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground">
+            A Fazer: <strong className="text-foreground">{todoCount}</strong>
+          </span>
+          <span className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground">
+            Em Andamento:{" "}
+            <strong className="text-foreground">{inProgressCount}</strong>
+          </span>
+          <span className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground">
+            Concluído: <strong className="text-foreground">{doneCount}</strong>
+          </span>
+          {sprintDaysLeft !== null && (
+            <span className="rounded-md bg-secondary px-3 py-1.5 text-muted-foreground">
+              {sprintDaysLeft > 0
+                ? `${sprintDaysLeft} dia${sprintDaysLeft === 1 ? "" : "s"} restantes`
+                : sprintDaysLeft === 0
+                  ? "Encerra hoje"
+                  : `Encerrada há ${Math.abs(sprintDaysLeft)} dia${Math.abs(sprintDaysLeft) === 1 ? "" : "s"}`}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <div className="h-3 w-full overflow-hidden rounded-full bg-secondary">
+            <div className="flex h-full w-full">
+              <div
+                className="h-full bg-col-todo"
+                style={{ width: `${percTodo}%` }}
+              />
+              <div
+                className="h-full bg-col-progress"
+                style={{ width: `${percInProgress}%` }}
+              />
+              <div
+                className="h-full bg-col-done"
+                style={{ width: `${percDone}%` }}
+              />
+            </div>
+          </div>
+          <div className="flex justify-between text-[11px] text-muted-foreground">
+            <span>A Fazer: {percTodo}%</span>
+            <span>Em Andamento: {percInProgress}%</span>
+            <span>Concluído: {percDone}%</span>
+          </div>
+        </div>
       </div>
 
       {/* Error */}

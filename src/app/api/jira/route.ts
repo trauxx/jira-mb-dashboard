@@ -51,6 +51,7 @@ export async function POST(req: Request) {
 
     let sprintName = activeSprint?.name ?? "Sem sprint ativa";
     const sprintStartDate = activeSprint?.startDate ?? null;
+    const sprintEndDate = activeSprint?.endDate ?? null;
     let jql: string | null = activeSprint ? `sprint=${activeSprint.id}` : null;
 
     if (!jql) {
@@ -94,6 +95,8 @@ export async function POST(req: Request) {
           "priority",
           "issuetype",
           "created",
+          "customfield_10016",
+          "customfield_10026",
         ],
       }),
     });
@@ -120,9 +123,18 @@ export async function POST(req: Request) {
         avatarUrl: issue.fields.assignee?.avatarUrls?.["24x24"],
         priority: issue.fields.priority?.name,
         issueType: issue.fields.issuetype?.name,
+        storyPoints:
+          issue.fields.customfield_10016 ?? // padrão cloud
+          issue.fields.customfield_10026 ?? // alternativo comum
+          null,
       })) ?? [];
 
-    return NextResponse.json({ sprintName, sprintStartDate, issues });
+    return NextResponse.json({
+      sprintName,
+      sprintStartDate,
+      sprintEndDate,
+      issues,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro inesperado";
     return NextResponse.json({ error: message }, { status: 500 });
