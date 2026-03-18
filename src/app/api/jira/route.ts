@@ -5,6 +5,7 @@ interface JiraConfigPayload {
   email?: string;
   apiToken?: string;
   boardId?: string;
+  sprintId?: number | string;
 }
 
 function buildAuthHeader(email: string, apiToken: string) {
@@ -16,7 +17,7 @@ function buildAuthHeader(email: string, apiToken: string) {
 export async function POST(req: Request) {
   try {
     const body: JiraConfigPayload = await req.json();
-    const { domain, email, apiToken, boardId } = body;
+    const { domain, email, apiToken, boardId, sprintId } = body;
 
     if (!domain || !email || !apiToken || !boardId) {
       return NextResponse.json(
@@ -28,8 +29,17 @@ export async function POST(req: Request) {
     const authHeader = buildAuthHeader(email, apiToken);
     const baseUrl = `https://${domain}`;
 
+    const requestedSprintId =
+      sprintId !== undefined && sprintId !== null && sprintId !== ""
+        ? Number(sprintId)
+        : null;
+    const validRequestedSprintId =
+      requestedSprintId !== null && Number.isFinite(requestedSprintId)
+        ? requestedSprintId
+        : null;
+
     const sprintRes = await fetch(
-      `${baseUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active`,
+      `${baseUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future,closed&maxResults=50`,
       {
         headers: {
           Authorization: authHeader,
@@ -41,18 +51,33 @@ export async function POST(req: Request) {
 
     if (!sprintRes.ok) {
       return NextResponse.json(
-        { error: `Erro ao buscar sprint ativa (${sprintRes.status})` },
+        { error: `Erro ao buscar sprints (${sprintRes.status})` },
         { status: sprintRes.status },
       );
     }
 
     const sprintData = await sprintRes.json();
-    const activeSprint = sprintData.values?.[0];
+    const sprints =
+      sprintData.values?.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        state: s.state,
+        startDate: s.startDate ?? null,
+        endDate: s.endDate ?? null,
+      })) ?? [];
 
-    let sprintName = activeSprint?.name ?? "Sem sprint ativa";
-    const sprintStartDate = activeSprint?.startDate ?? null;
-    const sprintEndDate = activeSprint?.endDate ?? null;
-    let jql: string | null = activeSprint ? `sprint=${activeSprint.id}` : null;
+    const activeSprint = sprints.find((s: any) => s.state === "active");
+    const selectedSprint = validRequestedSprintId
+      ? sprints.find((s: any) => s.id === validRequestedSprintId)
+      : (activeSprint ?? sprints[0]);
+
+    let sprintName = selectedSprint?.name ?? "Sem sprint ativa";
+    const sprintStartDate = selectedSprint?.startDate ?? null;
+    const sprintEndDate = selectedSprint?.endDate ?? null;
+    const selectedSprintId = selectedSprint?.id ?? null;
+    let jql: string | null = selectedSprint
+      ? `sprint=${selectedSprint.id}`
+      : null;
 
     if (!jql) {
       const boardRes = await fetch(
@@ -123,6 +148,7 @@ export async function POST(req: Request) {
         avatarUrl: issue.fields.assignee?.avatarUrls?.["24x24"],
         priority: issue.fields.priority?.name,
         issueType: issue.fields.issuetype?.name,
+        browseUrl: `${baseUrl}/browse/${issue.key}`,
         storyPoints:
           issue.fields.customfield_10016 ?? // padrão cloud
           issue.fields.customfield_10026 ?? // alternativo comum
@@ -133,6 +159,8 @@ export async function POST(req: Request) {
       sprintName,
       sprintStartDate,
       sprintEndDate,
+      selectedSprintId,
+      sprints,
       issues,
     });
   } catch (error) {

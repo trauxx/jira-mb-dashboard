@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { JiraConfig, JiraIssue, BoardColumn } from "@/types/jira";
+import { JiraConfig, JiraIssue, BoardColumn, SprintInfo } from "@/types/jira";
 
 const STORAGE_KEY = "jira-config";
 
@@ -91,68 +91,92 @@ export function useJiraBoard() {
   const [error, setError] = useState<string | null>(null);
   const [sprintName, setSprintName] = useState<string>("");
   const [sprintEndDate, setSprintEndDate] = useState<string | null>(null);
+  const [sprints, setSprints] = useState<SprintInfo[]>([]);
+  const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
 
-  const fetchBoard = useCallback(async (config: JiraConfig) => {
-    setLoading(true);
-    setError(null);
+  const fetchBoard = useCallback(
+    async (config: JiraConfig, sprintId?: number | null) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const res = await fetch("/api/jira", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(config),
-      });
+      try {
+        const res = await fetch("/api/jira", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ ...config, sprintId }),
+        });
 
-      if (!res.ok) {
-        const { error: apiError } = await res.json();
-        throw new Error(apiError || `Erro ao consultar o Jira (${res.status})`);
-      }
-
-      const data: {
-        sprintName?: string;
-        sprintStartDate?: string | null;
-        sprintEndDate?: string | null;
-        issues: JiraIssue[];
-      } = await res.json();
-
-      setSprintName(data.sprintName || "Sem sprint ativa");
-      const sprintStart = data.sprintStartDate
-        ? new Date(data.sprintStartDate)
-        : null;
-      setSprintEndDate(data.sprintEndDate ?? null);
-      const issues = data.issues;
-
-      // Distribute into columns
-      const newColumns: BoardColumn[] = [
-        { id: "planned", title: "PLANEJADO", statuses: [], issues: [] },
-        { id: "todo", title: "A FAZER", statuses: [], issues: [] },
-        { id: "inprogress", title: "EM ANDAMENTO", statuses: [], issues: [] },
-        { id: "done", title: "CONCLUÍDO", statuses: [], issues: [] },
-      ];
-
-      issues.forEach((issue) => {
-        const statusColumnId = mapStatusToColumn(issue.status);
-        const statusColumn = newColumns.find((c) => c.id === statusColumnId);
-        if (statusColumn) statusColumn.issues.push(issue);
-
-        if (sprintStart && issue.created) {
-          const created = new Date(issue.created);
-          if (!Number.isNaN(created.getTime()) && created <= sprintStart) {
-            const plannedColumn = newColumns.find((c) => c.id === "planned");
-            if (plannedColumn) plannedColumn.issues.push(issue);
-          }
+        if (!res.ok) {
+          const { error: apiError } = await res.json();
+          throw new Error(
+            apiError || `Erro ao consultar o Jira (${res.status})`,
+          );
         }
-      });
 
-      setColumns(newColumns);
-    } catch (err: any) {
-      setError(err.message || "Erro desconhecido");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        const data: {
+          sprintName?: string;
+          sprintStartDate?: string | null;
+          sprintEndDate?: string | null;
+          issues: JiraIssue[];
+          sprints?: SprintInfo[];
+          selectedSprintId?: number | null;
+        } = await res.json();
 
-  return { columns, loading, error, sprintName, sprintEndDate, fetchBoard };
+        setSprintName(data.sprintName || "Sem sprint ativa");
+        const sprintStart = data.sprintStartDate
+          ? new Date(data.sprintStartDate)
+          : null;
+        setSprintEndDate(data.sprintEndDate ?? null);
+        setSprints(data.sprints || []);
+        setSelectedSprintId(
+          typeof data.selectedSprintId === "number"
+            ? data.selectedSprintId
+            : null,
+        );
+        const issues = data.issues;
+
+        // Distribute into columns
+        const newColumns: BoardColumn[] = [
+          { id: "planned", title: "PLANEJADO", statuses: [], issues: [] },
+          { id: "todo", title: "A FAZER", statuses: [], issues: [] },
+          { id: "inprogress", title: "EM ANDAMENTO", statuses: [], issues: [] },
+          { id: "done", title: "CONCLUÍDO", statuses: [], issues: [] },
+        ];
+
+        issues.forEach((issue) => {
+          const statusColumnId = mapStatusToColumn(issue.status);
+          const statusColumn = newColumns.find((c) => c.id === statusColumnId);
+          if (statusColumn) statusColumn.issues.push(issue);
+
+          if (sprintStart && issue.created) {
+            const created = new Date(issue.created);
+            if (!Number.isNaN(created.getTime()) && created <= sprintStart) {
+              const plannedColumn = newColumns.find((c) => c.id === "planned");
+              if (plannedColumn) plannedColumn.issues.push(issue);
+            }
+          }
+        });
+
+        setColumns(newColumns);
+      } catch (err: any) {
+        setError(err.message || "Erro desconhecido");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
+  return {
+    columns,
+    loading,
+    error,
+    sprintName,
+    sprintEndDate,
+    sprints,
+    selectedSprintId,
+    fetchBoard,
+  };
 }

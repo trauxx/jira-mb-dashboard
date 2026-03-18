@@ -19,15 +19,30 @@ export default function BoardCard({ issue, columnId }: Props) {
 
   return (
     <div
-      className={`rounded-md px-3 py-2.5 text-sm font-medium flex items-center gap-2 ${statusColorMap[columnId]} text-primary-foreground shadow-md transition-transform hover:scale-[1.02]`}
+      className={`rounded-md px-3 py-2.5 text-sm font-medium flex items-start gap-2 ${statusColorMap[columnId]} text-primary-foreground shadow-md transition-transform hover:scale-[1.02]`}
     >
-      <span className="truncate flex-1">{issue.summary}</span>
+      <div className="flex flex-1 flex-wrap items-start gap-1 leading-snug">
+        <a
+          href={issue.browseUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 font-semibold underline-offset-2 hover:underline"
+        >
+          {issue.key}
+        </a>
+        <span className="shrink-0 opacity-80">-</span>
+        <span className="flex-1 whitespace-normal break-words">
+          {issue.summary}
+        </span>
+      </div>
       {hasStoryPoints && (
-        <span className="shrink-0 rounded-full bg-black/20 px-2 py-[2px] text-[11px] font-semibold">
+        <span className="shrink-0 self-start rounded-full bg-black/20 px-2 py-[2px] text-[11px] font-semibold">
           {issue.storyPoints}
         </span>
       )}
-      {isDone && <CheckCircle2 className="h-4 w-4 shrink-0 opacity-80" />}
+      {isDone && (
+        <CheckCircle2 className="h-4 w-4 shrink-0 self-start opacity-80" />
+      )}
     </div>
   );
 }

@@ -6,6 +6,13 @@ import { useJiraBoard, clearConfig } from "@/hooks/useJiraBoard";
 import BoardColumnComponent from "./BoardColumn";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, LogOut, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Props {
   config: JiraConfig;
@@ -13,8 +20,16 @@ interface Props {
 }
 
 export default function SprintBoard({ config, onLogout }: Props) {
-  const { columns, loading, error, sprintName, sprintEndDate, fetchBoard } =
-    useJiraBoard();
+  const {
+    columns,
+    loading,
+    error,
+    sprintName,
+    sprintEndDate,
+    sprints,
+    selectedSprintId,
+    fetchBoard,
+  } = useJiraBoard();
   const [clock, setClock] = useState(new Date());
 
   useEffect(() => {
@@ -29,6 +44,12 @@ export default function SprintBoard({ config, onLogout }: Props) {
   const handleLogout = () => {
     clearConfig();
     onLogout();
+  };
+
+  const handleSprintChange = (value: string) => {
+    const numericSprintId = Number(value);
+    if (Number.isNaN(numericSprintId)) return;
+    fetchBoard(config, numericSprintId);
   };
 
   const dateStr = clock.toLocaleDateString("pt-BR", {
@@ -97,26 +118,44 @@ export default function SprintBoard({ config, onLogout }: Props) {
   return (
     <div className="min-h-screen bg-background p-6 flex flex-col gap-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-2">
           <h1
             className="text-xl font-bold text-primary tracking-tight uppercase"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
-            Sprint Atual
+            Relatório de Sprint
           </h1>
-          {sprintName && (
-            <p className="text-xs text-muted-foreground mt-0.5">{sprintName}</p>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase text-muted-foreground">
+              Sprint
+            </span>
+            <Select
+              value={selectedSprintId ? String(selectedSprintId) : undefined}
+              onValueChange={handleSprintChange}
+              disabled={loading || !sprints.length}
+            >
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Selecione a sprint" />
+              </SelectTrigger>
+              <SelectContent>
+                {sprints.map((sprint) => (
+                  <SelectItem key={sprint.id} value={String(sprint.id)}>
+                    {sprint.name} {sprint.state === "active" ? "(Atual)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground uppercase">
+          <span className="text-xs text-muted-foreground uppercase text-right">
             {dateStr} — {timeStr}
           </span>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => fetchBoard(config)}
+            onClick={() => fetchBoard(config, selectedSprintId)}
             disabled={loading}
             className="text-muted-foreground hover:text-foreground"
           >

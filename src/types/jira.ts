@@ -9,6 +9,7 @@ export interface JiraIssue {
   avatarUrl?: string;
   priority?: string;
   issueType?: string;
+  browseUrl?: string;
 }
 
 export interface JiraConfig {
@@ -16,6 +17,14 @@ export interface JiraConfig {
   email: string;
   apiToken: string;
   boardId: string;
+}
+
+export interface SprintInfo {
+  id: number;
+  name: string;
+  state: string;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 export type ColumnStatus = "planned" | "todo" | "inprogress" | "done";
