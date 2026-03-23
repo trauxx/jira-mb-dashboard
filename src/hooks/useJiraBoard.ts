@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { JiraConfig, JiraIssue, BoardColumn, SprintInfo } from "@/types/jira";
+import {
+  JiraConfig,
+  JiraIssue,
+  BoardColumn,
+  SprintInfo,
+  ColumnStatus,
+} from "@/types/jira";
 
 const STORAGE_KEY = "jira-config";
 
@@ -146,15 +152,32 @@ export function useJiraBoard() {
         ];
 
         issues.forEach((issue) => {
-          const statusColumnId = mapStatusToColumn(issue.status);
-          const statusColumn = newColumns.find((c) => c.id === statusColumnId);
-          if (statusColumn) statusColumn.issues.push(issue);
+          const normalizedStatus = mapStatusToColumn(
+            issue.status,
+          ) as ColumnStatus;
+          const created = issue.created ? new Date(issue.created) : null;
+          const addedAfterPlanned = Boolean(
+            sprintStart &&
+            created &&
+            !Number.isNaN(created.getTime()) &&
+            created > sprintStart,
+          );
 
-          if (sprintStart && issue.created) {
-            const created = new Date(issue.created);
+          const enrichedIssue: JiraIssue = {
+            ...issue,
+            normalizedStatus,
+            addedAfterPlanned,
+          };
+
+          const statusColumn = newColumns.find(
+            (c) => c.id === normalizedStatus,
+          );
+          if (statusColumn) statusColumn.issues.push(enrichedIssue);
+
+          if (sprintStart && created) {
             if (!Number.isNaN(created.getTime()) && created <= sprintStart) {
               const plannedColumn = newColumns.find((c) => c.id === "planned");
-              if (plannedColumn) plannedColumn.issues.push(issue);
+              if (plannedColumn) plannedColumn.issues.push(enrichedIssue);
             }
           }
         });

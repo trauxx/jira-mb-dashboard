@@ -11,6 +11,8 @@ export interface JiraIssue {
   issueType?: string;
   browseUrl?: string;
   labels?: string[];
+  normalizedStatus?: ColumnStatus;
+  addedAfterPlanned?: boolean;
 }
 
 export interface JiraConfig {

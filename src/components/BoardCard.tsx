@@ -1,5 +1,5 @@
 import { JiraIssue, ColumnStatus } from "@/types/jira";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle } from "lucide-react";
 
 const statusColorMap: Record<ColumnStatus, string> = {
   planned: "bg-col-planned",
@@ -14,7 +14,8 @@ interface Props {
 }
 
 export default function BoardCard({ issue, columnId }: Props) {
-  const isDone = columnId === "done";
+  const isDone = issue.normalizedStatus === "done" || columnId === "done";
+  const isLate = issue.addedAfterPlanned === true;
 
   return (
     <div
@@ -34,9 +35,15 @@ export default function BoardCard({ issue, columnId }: Props) {
           {issue.summary}
         </span>
       </div>
-      {isDone && (
-        <CheckCircle2 className="h-4 w-4 shrink-0 self-start opacity-80" />
-      )}
+      <div className="flex items-center gap-1 self-start">
+        {isLate && (
+          <AlertTriangle
+            className="h-4 w-4 shrink-0 text-amber-400"
+            aria-label="Entrou após o planejamento"
+          />
+        )}
+        {isDone && <CheckCircle2 className="h-4 w-4 shrink-0 opacity-80" />}
+      </div>
     </div>
   );
 }
