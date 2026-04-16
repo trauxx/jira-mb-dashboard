@@ -20,10 +20,7 @@ import {
 } from "@/components/ui/chart";
 import { Pie, PieChart, Cell } from "recharts";
 
-const CAPACITY_BY_COMPANY = {
-  MB: 227,
-  ISA: 163,
-} as const;
+const MB_CAPACITY_HOURS = 227;
 
 interface Props {
   config: JiraConfig;
@@ -42,16 +39,6 @@ export default function SprintBoard({ config, onLogout }: Props) {
     fetchBoard,
   } = useJiraBoard();
   const [clock, setClock] = useState(new Date());
-  const [companyFilter, setCompanyFilter] = useState<"all" | "ISA" | "MB">(
-    "all",
-  );
-
-  const totalCapacityHours = useMemo(() => {
-    if (companyFilter === "all") {
-      return CAPACITY_BY_COMPANY.MB + CAPACITY_BY_COMPANY.ISA;
-    }
-    return CAPACITY_BY_COMPANY[companyFilter];
-  }, [companyFilter]);
 
   useEffect(() => {
     fetchBoard(config);
@@ -90,15 +77,14 @@ export default function SprintBoard({ config, onLogout }: Props) {
   });
 
   const filteredColumns = useMemo(() => {
-    if (companyFilter === "all") return columns;
-    const target = companyFilter.toUpperCase();
+    const target = "MB";
     return columns.map((col) => ({
       ...col,
       issues: col.issues.filter((issue) =>
         (issue.labels ?? []).some((label) => label.toUpperCase() === target),
       ),
     }));
-  }, [columns, companyFilter]);
+  }, [columns]);
 
   const {
     totalIssues,
@@ -165,10 +151,10 @@ export default function SprintBoard({ config, onLogout }: Props) {
         0,
       );
 
-      const remainingHours = Math.max(totalCapacityHours - completedHours, 0);
+      const remainingHours = Math.max(MB_CAPACITY_HOURS - completedHours, 0);
       const capacityPercentage = Math.min(
         100,
-        Math.round((completedHours / totalCapacityHours) * 100),
+        Math.round((completedHours / MB_CAPACITY_HOURS) * 100),
       );
 
       return {
@@ -180,7 +166,7 @@ export default function SprintBoard({ config, onLogout }: Props) {
           { name: "remaining", label: "Restante", value: remainingHours },
         ],
       };
-    }, [filteredColumns, totalCapacityHours]);
+    }, [filteredColumns]);
 
   return (
     <div className="min-h-screen bg-background p-6 flex flex-col gap-5">
@@ -220,22 +206,6 @@ export default function SprintBoard({ config, onLogout }: Props) {
             <span className="text-xs text-muted-foreground uppercase text-right">
               {dateStr} — {timeStr}
             </span>
-            <Select
-              value={companyFilter}
-              onValueChange={(value) =>
-                setCompanyFilter(value as "all" | "ISA" | "MB")
-              }
-              disabled={loading}
-            >
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="ISA">ISA</SelectItem>
-                <SelectItem value="MB">MB</SelectItem>
-              </SelectContent>
-            </Select>
             <Button
               variant="ghost"
               size="icon"
@@ -293,8 +263,8 @@ export default function SprintBoard({ config, onLogout }: Props) {
                   {capacityPercentage}%
                 </span>
                 <span className="text-[11px] text-muted-foreground">
-                  {Math.min(completedHours, totalCapacityHours)}h de{" "}
-                  {totalCapacityHours}h
+                  {Math.min(completedHours, MB_CAPACITY_HOURS)}h de{" "}
+                  {MB_CAPACITY_HOURS}h
                 </span>
               </div>
             </div>
